@@ -1,0 +1,33 @@
+name: Build Asep
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install core dan library
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib install LovyanGFX ArduinoJson
+
+      - name: Compile
+        # Ubah PSRAM=opi jadi PSRAM=enabled kalau board kamu QSPI PSRAM (bukan N16R8)
+        # Ubah FlashSize sesuai board (4M / 8M / 16M)
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32s3:PSRAM=opi,PartitionScheme=huge_app,FlashSize=16M \
+            --export-binaries asep_mochi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: asep-bin
+          path: asep_mochi/build/**/*.bin
