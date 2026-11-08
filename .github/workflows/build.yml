@@ -21,19 +21,22 @@ jobs:
             sed -i "s|#define STT_API_KEY   \"\"|#define STT_API_KEY   \"${STT_KEY}\"|" asep_mochi/asep_mochi.ino
           fi
 
-      - name: Install core dan library (otomatis ulang kalau server error)
+      - name: Install core ESP32 (coba beberapa versi kalau server error)
         run: |
           arduino-cli config init
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          for i in 1 2 3 4 5 6; do
-            echo "=== Percobaan $i ==="
-            if arduino-cli core update-index && arduino-cli core install esp32:esp32; then
-              break
-            fi
-            if [ "$i" = "6" ]; then echo "Gagal 6 kali"; exit 1; fi
-            echo "Gagal, tunggu 60 detik lalu ulangi..."
-            sleep 60
+          arduino-cli core update-index
+          ok=0
+          for ver in 3.3.0 3.2.0 latest; do
+            for try in 1 2 3; do
+              echo "=== Core $ver, percobaan $try ==="
+              if [ "$ver" = "latest" ]; then target="esp32:esp32"; else target="esp32:esp32@$ver"; fi
+              if arduino-cli core install "$target"; then ok=1; break 2; fi
+              sleep 30
+            done
           done
+          if [ "$ok" != "1" ]; then echo "Semua versi gagal diunduh"; exit 1; fi
+          arduino-cli core list
           for i in 1 2 3; do
             arduino-cli lib install LovyanGFX ArduinoJson && break
             sleep 20
@@ -51,4 +54,5 @@ jobs:
         with:
           name: asep-bin
           path: asep_mochi/build/**/*.bin
+
 
