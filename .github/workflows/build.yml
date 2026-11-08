@@ -11,13 +11,33 @@ jobs:
 
       - uses: arduino/setup-arduino-cli@v2
 
-      - name: Install core dan library
+      - name: Suntik API key dari Secrets
+        env:
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
+          STT_KEY: ${{ secrets.STT_KEY }}
+        run: |
+          sed -i "s|PASTE_OPENROUTER_KEY_DISINI|${OPENROUTER_KEY}|" asep_mochi/asep_mochi.ino
+          if [ -n "$STT_KEY" ]; then
+            sed -i "s|#define STT_API_KEY   \"\"|#define STT_API_KEY   \"${STT_KEY}\"|" asep_mochi/asep_mochi.ino
+          fi
+
+      - name: Install core dan library (otomatis ulang kalau server error)
         run: |
           arduino-cli config init
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core update-index
-          arduino-cli core install esp32:esp32
-          arduino-cli lib install LovyanGFX ArduinoJson
+          for i in 1 2 3 4 5 6; do
+            echo "=== Percobaan $i ==="
+            if arduino-cli core update-index && arduino-cli core install esp32:esp32; then
+              break
+            fi
+            if [ "$i" = "6" ]; then echo "Gagal 6 kali"; exit 1; fi
+            echo "Gagal, tunggu 60 detik lalu ulangi..."
+            sleep 60
+          done
+          for i in 1 2 3; do
+            arduino-cli lib install LovyanGFX ArduinoJson && break
+            sleep 20
+          done
 
       - name: Compile
         # Ubah PSRAM=opi jadi PSRAM=enabled kalau board kamu QSPI PSRAM (bukan N16R8)
@@ -31,3 +51,4 @@ jobs:
         with:
           name: asep-bin
           path: asep_mochi/build/**/*.bin
+
